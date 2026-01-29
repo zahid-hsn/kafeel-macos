@@ -4,6 +4,8 @@ import KafeelCore
 struct StreakCard: View {
     let streak: Streak
     @State private var animatedProgress: Double = 0
+    @State private var isHovering = false
+    @State private var showDetail = false
 
     private var streakColor: Color {
         streak.isActive ? .green : .gray
@@ -151,9 +153,30 @@ struct StreakCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.cornerRadiusLarge, style: .continuous)
-                .strokeBorder(streakColor.opacity(0.2), lineWidth: 1)
+                .strokeBorder(
+                    isHovering ? streakColor.opacity(0.4) : streakColor.opacity(0.2),
+                    lineWidth: isHovering ? 1.5 : 1
+                )
+                .animation(AppTheme.animationFast, value: isHovering)
         )
-        .shadow(color: streakColor.opacity(0.1), radius: 10, y: 4)
+        .shadow(
+            color: isHovering ? streakColor.opacity(0.2) : streakColor.opacity(0.1),
+            radius: isHovering ? 16 : 10,
+            y: isHovering ? 6 : 4
+        )
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(AppTheme.animationSpring, value: isHovering)
+        .onTapGesture {
+            showDetail = true
+        }
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.2)) {
                 animatedProgress = streak.progressToNextMilestone
@@ -163,6 +186,9 @@ struct StreakCard: View {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
                 animatedProgress = newValue
             }
+        }
+        .sheet(isPresented: $showDetail) {
+            StreakDetailView(streak: streak)
         }
     }
 }

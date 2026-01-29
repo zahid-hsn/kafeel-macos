@@ -7,6 +7,8 @@ struct ScreenTimeComparison: View {
     let timeFilter: TimeFilter
 
     @State private var isAnimated = false
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private var comparisonData: [ComparisonData] {
         let calendar = Calendar.current
@@ -128,6 +130,17 @@ struct ScreenTimeComparison: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.01 : 1.0)
+        .animation(.spring(response: 0.3), value: isHovering)
+        .onHover { isHovering = $0 }
+        .onTapGesture { showDetail = true }
+        .sheet(isPresented: $showDetail) {
+            ScreenTimeComparisonDetailView(
+                comparisonData: comparisonData,
+                difference: difference,
+                timeFilter: timeFilter
+            )
+        }
         .onAppear {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.7).delay(0.2)) {
                 isAnimated = true
@@ -244,6 +257,227 @@ struct ComparisonData: Identifiable {
 enum ComparisonType {
     case previous
     case current
+}
+
+// MARK: - Detail View
+
+struct ScreenTimeComparisonDetailView: View {
+    let comparisonData: [ComparisonData]
+    let difference: (seconds: Int, isIncrease: Bool)
+    let timeFilter: TimeFilter
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Screen Time Comparison")
+                        .font(.title2.weight(.bold))
+
+                    Text(periodLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 20) {
+                HStack(spacing: 20) {
+                    if comparisonData.count == 2 {
+                        PeriodCard(
+                            label: comparisonData[0].label,
+                            seconds: comparisonData[0].seconds,
+                            color: .secondary
+                        )
+
+                        PeriodCard(
+                            label: comparisonData[1].label,
+                            seconds: comparisonData[1].seconds,
+                            color: .blue
+                        )
+                    }
+                }
+
+                Divider()
+
+                VStack(spacing: 16) {
+                    HStack {
+                        Image(systemName: difference.isIncrease ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(difference.isIncrease ? .red : .green)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(formatDifference(difference.seconds))
+                                .font(.title.weight(.bold))
+
+                            Text(difference.isIncrease ? "More screen time" : "Less screen time")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+
+                            Text("compared to previous period")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill((difference.isIncrease ? Color.red : Color.green).opacity(0.1))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(
+                                (difference.isIncrease ? Color.red : Color.green).opacity(0.2),
+                                lineWidth: 1
+                            )
+                    )
+
+                    if comparisonData.count == 2 {
+                        let percentageChange = calculatePercentageChange()
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 4) {
+                                Text("\(abs(percentageChange))%")
+                                    .font(.title2.weight(.bold))
+                                    .foregroundStyle(difference.isIncrease ? .red : .green)
+
+                                Text("Percentage change")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(.ultraThinMaterial)
+                        )
+                    }
+                }
+
+                Spacer()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Insights")
+                        .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(insights, id: \.self) { insight in
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "lightbulb.fill")
+                                    .foregroundStyle(.yellow)
+                                    .font(.caption)
+                                Text(insight)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(32)
+        .frame(width: 600, height: 650)
+    }
+
+    private var periodLabel: String {
+        switch timeFilter {
+        case .day: return "Today vs Yesterday"
+        case .week: return "This Week vs Last Week"
+        case .year: return "This Year vs Last Year"
+        }
+    }
+
+    private func calculatePercentageChange() -> Int {
+        guard comparisonData.count == 2 else { return 0 }
+        let current = comparisonData[1].seconds
+        let previous = comparisonData[0].seconds
+        guard previous > 0 else { return 0 }
+        return Int((Double(current - previous) / Double(previous)) * 100)
+    }
+
+    private var insights: [String] {
+        var result: [String] = []
+
+        if difference.isIncrease {
+            result.append("You're spending more time on screen. Consider setting time limits for apps.")
+            result.append("Regular breaks can help maintain focus and reduce eye strain.")
+        } else {
+            result.append("Great job reducing screen time! This helps maintain work-life balance.")
+            result.append("Keep up the good habits and continue monitoring your usage.")
+        }
+
+        return result
+    }
+
+    private func formatDifference(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 {
+            if minutes > 0 {
+                return "\(hours)h \(minutes)m"
+            }
+            return "\(hours)h"
+        } else if minutes > 0 {
+            return "\(minutes)m"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+struct PeriodCard: View {
+    let label: String
+    let seconds: Int
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(formatTime(seconds))
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+
+            Text("Total screen time")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private func formatTime(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
 }
 
 #Preview {

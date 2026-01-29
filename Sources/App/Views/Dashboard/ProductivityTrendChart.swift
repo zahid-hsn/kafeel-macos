@@ -9,6 +9,8 @@ struct ProductivityTrendChart: View {
 
     @State private var selectedDataPoint: ProductivityDataPoint?
     @State private var isAnimated = false
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private var dataPoints: [ProductivityDataPoint] {
         switch timeFilter {
@@ -46,6 +48,17 @@ struct ProductivityTrendChart: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.01 : 1.0)
+        .animation(.spring(response: 0.3), value: isHovering)
+        .onHover { isHovering = $0 }
+        .onTapGesture { showDetail = true }
+        .sheet(isPresented: $showDetail) {
+            ProductivityTrendDetailView(
+                dataPoints: dataPoints,
+                averageScore: averageScore,
+                timeFilter: timeFilter
+            )
+        }
         .onAppear {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.1)) {
                 isAnimated = true
@@ -313,6 +326,203 @@ struct ProductivityDataPoint: Identifiable {
     let label: String
     let score: Double
     let time: Date
+}
+
+// MARK: - Detail View
+
+struct ProductivityTrendDetailView: View {
+    let dataPoints: [ProductivityDataPoint]
+    let averageScore: Double
+    let timeFilter: TimeFilter
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Extended Trend Analysis")
+                        .font(.title2.weight(.bold))
+
+                    Text(periodLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 20) {
+                HStack(spacing: 20) {
+                    TrendStatBox(
+                        title: "Average Score",
+                        value: "\(Int(averageScore))",
+                        color: scoreColor(averageScore),
+                        subtitle: scoreLabel(averageScore)
+                    )
+
+                    TrendStatBox(
+                        title: "Highest Score",
+                        value: "\(Int(dataPoints.map(\.score).max() ?? 0))",
+                        color: .green,
+                        subtitle: "Peak performance"
+                    )
+
+                    TrendStatBox(
+                        title: "Lowest Score",
+                        value: "\(Int(dataPoints.map(\.score).min() ?? 0))",
+                        color: .orange,
+                        subtitle: "Needs improvement"
+                    )
+                }
+
+                Divider()
+
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(dataPoints) { point in
+                            TrendDataRow(point: point)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(32)
+        .frame(width: 700, height: 600)
+    }
+
+    private var periodLabel: String {
+        switch timeFilter {
+        case .day: return "Hourly breakdown"
+        case .week: return "Daily breakdown"
+        case .year: return "Monthly breakdown"
+        }
+    }
+
+    private func scoreColor(_ score: Double) -> Color {
+        switch score {
+        case 80...100: return .green
+        case 60..<80: return .blue
+        case 40..<60: return .yellow
+        case 20..<40: return .orange
+        default: return .red
+        }
+    }
+
+    private func scoreLabel(_ score: Double) -> String {
+        switch score {
+        case 80...100: return "Excellent"
+        case 60..<80: return "Good"
+        case 40..<60: return "Fair"
+        case 20..<40: return "Poor"
+        default: return "Low"
+        }
+    }
+}
+
+struct TrendStatBox: View {
+    let title: String
+    let value: String
+    let color: Color
+    let subtitle: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+        )
+    }
+}
+
+struct TrendDataRow: View {
+    let point: ProductivityDataPoint
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Text(point.label)
+                .font(.body.weight(.medium))
+                .frame(width: 100, alignment: .leading)
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.1))
+                        .frame(height: 24)
+
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(scoreGradient(point.score))
+                        .frame(width: geometry.size.width * (point.score / 100), height: 24)
+
+                    HStack {
+                        Spacer()
+                        Text("\(Int(point.score))")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                    }
+                    .frame(height: 24)
+                }
+            }
+            .frame(height: 24)
+
+            Text(scoreLabel(point.score))
+                .font(.caption)
+                .foregroundStyle(scoreColor(point.score))
+                .frame(width: 80, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func scoreGradient(_ score: Double) -> LinearGradient {
+        let color = scoreColor(score)
+        return LinearGradient(
+            colors: [color, color.opacity(0.7)],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    private func scoreColor(_ score: Double) -> Color {
+        switch score {
+        case 80...100: return .green
+        case 60..<80: return .blue
+        case 40..<60: return .yellow
+        case 20..<40: return .orange
+        default: return .red
+        }
+    }
+
+    private func scoreLabel(_ score: Double) -> String {
+        switch score {
+        case 80...100: return "Excellent"
+        case 60..<80: return "Good"
+        case 40..<60: return "Fair"
+        case 20..<40: return "Poor"
+        default: return "Low"
+        }
+    }
 }
 
 #Preview {

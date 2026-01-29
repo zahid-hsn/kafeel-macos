@@ -5,6 +5,9 @@ struct HorizontalActivityTimeline: View {
     let activities: [ActivityLog]
     let categories: [String: CategoryType]
 
+    @State private var showDetail = false
+    @State private var isHovering = false
+
     // Hours to display: 6am to 10pm
     private let startHour = 6
     private let endHour = 22
@@ -49,9 +52,9 @@ struct HorizontalActivityTimeline: View {
 
                 // Legend
                 HStack(spacing: 12) {
-                    LegendItem(color: .green, label: "Productive")
-                    LegendItem(color: .gray, label: "Neutral")
-                    LegendItem(color: .red, label: "Distracted")
+                    TimelineLegendItem(color: .green, label: "Productive")
+                    TimelineLegendItem(color: .gray, label: "Neutral")
+                    TimelineLegendItem(color: .red, label: "Distracted")
                 }
                 .font(.caption2)
             }
@@ -88,6 +91,17 @@ struct HorizontalActivityTimeline: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .onTapGesture {
+            showDetail = true
+        }
+        .sheet(isPresented: $showDetail) {
+            TimelineDetailView(activities: activities, categories: categories)
+        }
     }
 
     private func colorForCategory(_ category: CategoryType?) -> Color {
@@ -106,7 +120,7 @@ struct HorizontalActivityTimeline: View {
     }
 }
 
-private struct LegendItem: View {
+private struct TimelineLegendItem: View {
     let color: Color
     let label: String
 

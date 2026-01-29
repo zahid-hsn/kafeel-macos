@@ -42,8 +42,14 @@ struct DashboardView: View {
 
                 // Row 1: Focus Score Donut + Compact Stats
                 HStack(spacing: 16) {
-                    FocusScoreDonut(score: appState.focusScore)
-                        .frame(width: 180)
+                    FocusScoreDonut(
+                        score: appState.focusScore,
+                        productiveSeconds: appState.productiveSeconds,
+                        distractingSeconds: appState.distractingSeconds,
+                        neutralSeconds: appState.neutralSeconds,
+                        totalSeconds: appState.totalSeconds
+                    )
+                    .frame(width: 180)
 
                     CompactStatsView(
                         stats: appState.appUsageStats,
@@ -122,7 +128,10 @@ struct DashboardView: View {
 
                 // Row 5: Hourly Activity + Browsing Activity
                 HStack(spacing: 16) {
-                    HourlyActivityChart(activities: appState.todayActivities)
+                    HourlyActivityChart(
+                        activities: appState.todayActivities,
+                        categories: fetchCategories()
+                    )
 
                     BrowsingActivityCard()
                 }

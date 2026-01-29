@@ -9,6 +9,8 @@ struct DailyHeatmap: View {
     @State private var selectedHour: HourData?
     @State private var hoveredHour: Int?
     @State private var isAnimated = false
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private var hourlyData: [HourData] {
         let calendar = Calendar.current
@@ -109,6 +111,13 @@ struct DailyHeatmap: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.01 : 1.0)
+        .animation(.spring(response: 0.3), value: isHovering)
+        .onHover { isHovering = $0 }
+        .onTapGesture { showDetail = true }
+        .sheet(isPresented: $showDetail) {
+            DailyHeatmapDetailView(activities: activities, categories: categories, hourlyData: hourlyData)
+        }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.1)) {
                 isAnimated = true
@@ -288,6 +297,112 @@ struct FlowLayout: Layout {
         }
 
         return (CGSize(width: width, height: currentY + lineHeight), positions)
+    }
+}
+
+// MARK: - Detail View
+
+struct DailyHeatmapDetailView: View {
+    let activities: [ActivityLog]
+    let categories: [String: CategoryType]
+    let hourlyData: [HourData]
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                Text("24-Hour Activity Breakdown")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(hourlyData) { hour in
+                        HourDetailCard(hour: hour)
+                    }
+                }
+            }
+        }
+        .padding(32)
+        .frame(width: 600, height: 700)
+    }
+}
+
+struct HourDetailCard: View {
+    let hour: HourData
+
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(spacing: 4) {
+                Text("\(hour.hour)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                Text(":00")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 50)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("\(hour.activityCount) activities")
+                        .font(.body.weight(.medium))
+                    Spacer()
+                    Text(formatDuration(hour.duration))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                if !hour.apps.isEmpty {
+                    FlowLayout(spacing: 6) {
+                        ForEach(hour.apps.prefix(15), id: \.self) { app in
+                            Text(app)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.blue.opacity(0.1))
+                                .foregroundStyle(.blue)
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.blue.opacity(0.2 + hour.intensity * 0.8))
+                            .frame(width: geometry.size.width * hour.intensity)
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(hour.activityCount > 0 ? Color.blue.opacity(0.05) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
     }
 }
 

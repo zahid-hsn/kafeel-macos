@@ -8,6 +8,8 @@ struct CategoryPieChart: View {
 
     @State private var selectedCategory: CategoryData?
     @State private var isAnimated = false
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private var categoryData: [CategoryData] {
         var productive = 0
@@ -87,6 +89,17 @@ struct CategoryPieChart: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .onTapGesture {
+            showDetail = true
+        }
+        .sheet(isPresented: $showDetail) {
+            CategoryDetailView(activities: activities, categories: categories)
+        }
         .onAppear {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.7).delay(0.2)) {
                 isAnimated = true
@@ -231,17 +244,6 @@ struct CategoryPieChart: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-}
-
-struct CategoryData: Identifiable, Equatable {
-    let id: UUID
-    let category: CategoryType
-    let seconds: Int
-    let percentage: Double
-
-    static func == (lhs: CategoryData, rhs: CategoryData) -> Bool {
-        lhs.id == rhs.id
     }
 }
 

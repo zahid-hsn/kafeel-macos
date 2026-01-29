@@ -217,6 +217,8 @@ enum InsightType {
 
 struct InsightCard: View {
     let insight: Insight
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -248,6 +250,127 @@ struct InsightCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(insight.type.color.opacity(0.3), lineWidth: 1)
         )
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3), value: isHovering)
+        .onHover { isHovering = $0 }
+        .onTapGesture { showDetail = true }
+        .sheet(isPresented: $showDetail) {
+            InsightDetailView(insight: insight)
+        }
+    }
+}
+
+// MARK: - Insight Detail View
+
+struct InsightDetailView: View {
+    let insight: Insight
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                Image(systemName: insight.icon)
+                    .font(.largeTitle)
+                    .foregroundStyle(insight.type.color)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(insight.title)
+                        .font(.title2.weight(.bold))
+
+                    Text(insightTypeLabel(insight.type))
+                        .font(.caption)
+                        .foregroundStyle(insight.type.color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(insight.type.backgroundColor)
+                        )
+                }
+
+                Spacer()
+
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Details")
+                    .font(.headline)
+
+                Text(insight.message)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Recommendations")
+                        .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(recommendations(for: insight), id: \.self) { recommendation in
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(insight.type.color)
+                                    .font(.caption)
+                                Text(recommendation)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(32)
+        .frame(width: 500)
+    }
+
+    private func insightTypeLabel(_ type: InsightType) -> String {
+        switch type {
+        case .positive: return "Achievement"
+        case .warning: return "Warning"
+        case .info: return "Information"
+        case .tip: return "Tip"
+        }
+    }
+
+    private func recommendations(for insight: Insight) -> [String] {
+        switch insight.type {
+        case .positive:
+            return [
+                "Keep maintaining your current productivity habits",
+                "Set this time as your focus period for important tasks",
+                "Track your patterns to identify what works best"
+            ]
+        case .warning:
+            return [
+                "Use app blockers during focus hours",
+                "Set specific time blocks for different activities",
+                "Take breaks to prevent burnout",
+                "Review your app categories and adjust as needed"
+            ]
+        case .info:
+            return [
+                "Monitor your app usage trends over time",
+                "Consider if this app usage aligns with your goals",
+                "Adjust your workflow based on these patterns"
+            ]
+        case .tip:
+            return [
+                "Use the Pomodoro technique (25 min work, 5 min break)",
+                "Stand and stretch every hour",
+                "Stay hydrated throughout the day",
+                "Consider using focus music or white noise"
+            ]
+        }
     }
 }
 

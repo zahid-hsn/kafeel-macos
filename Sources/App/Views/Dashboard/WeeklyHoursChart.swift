@@ -5,6 +5,9 @@ import KafeelCore
 struct WeeklyHoursChart: View {
     let activities: [ActivityLog]
 
+    @State private var showDetail = false
+    @State private var isHovering = false
+
     private var weeklyData: [DayHours] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -104,6 +107,17 @@ struct WeeklyHoursChart: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .onTapGesture {
+            showDetail = true
+        }
+        .sheet(isPresented: $showDetail) {
+            WeeklyHoursDetailView(activities: activities)
+        }
     }
 }
 

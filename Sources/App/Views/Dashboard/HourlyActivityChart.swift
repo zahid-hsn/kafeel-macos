@@ -4,6 +4,10 @@ import KafeelCore
 
 struct HourlyActivityChart: View {
     let activities: [ActivityLog]
+    let categories: [String: CategoryType]
+
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private var hourlyData: [HourActivity] {
         let calendar = Calendar.current
@@ -107,6 +111,17 @@ struct HourlyActivityChart: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .onTapGesture {
+            showDetail = true
+        }
+        .sheet(isPresented: $showDetail) {
+            HourlyDetailView(activities: activities, categories: categories)
+        }
     }
 }
 
@@ -118,7 +133,7 @@ private struct HourActivity: Identifiable {
 }
 
 #Preview {
-    HourlyActivityChart(activities: [])
+    HourlyActivityChart(activities: [], categories: [:])
         .padding()
         .frame(width: 600)
 }

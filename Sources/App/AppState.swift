@@ -24,9 +24,45 @@ final class AppState {
     // Dependencies
     private var modelContext: ModelContext?
 
+    // MARK: - Computed Properties for Detail Views
+
+    var productiveSeconds: Int {
+        guard let modelContext = modelContext else { return 0 }
+        let categories = fetchCategories(from: modelContext)
+        return todayActivities
+            .filter { categories[$0.appBundleIdentifier] == .productive }
+            .reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    var distractingSeconds: Int {
+        guard let modelContext = modelContext else { return 0 }
+        let categories = fetchCategories(from: modelContext)
+        return todayActivities
+            .filter { categories[$0.appBundleIdentifier] == .distracting }
+            .reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    var neutralSeconds: Int {
+        guard let modelContext = modelContext else { return 0 }
+        let categories = fetchCategories(from: modelContext)
+        return todayActivities
+            .filter { categories[$0.appBundleIdentifier] == .neutral }
+            .reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    var totalSeconds: Int {
+        todayActivities.reduce(0) { $0 + $1.durationSeconds }
+    }
+
     init(modelContext: ModelContext? = nil) {
         self.modelContext = modelContext
         self.activityMonitor = ActivityMonitor()
+    }
+
+    private func fetchCategories(from context: ModelContext) -> [String: CategoryType] {
+        let descriptor = FetchDescriptor<AppCategory>()
+        let categories = (try? context.fetch(descriptor)) ?? []
+        return Dictionary(uniqueKeysWithValues: categories.map { ($0.bundleIdentifier, $0.category) })
     }
 
     func startTracking() {

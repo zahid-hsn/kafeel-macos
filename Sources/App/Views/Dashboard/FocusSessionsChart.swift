@@ -8,6 +8,8 @@ struct FocusSessionsChart: View {
 
     @State private var selectedSession: FocusSession?
     @State private var isAnimated = false
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private let focusThresholdMinutes = 25
 
@@ -149,6 +151,13 @@ struct FocusSessionsChart: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.01 : 1.0)
+        .animation(.spring(response: 0.3), value: isHovering)
+        .onHover { isHovering = $0 }
+        .onTapGesture { showDetail = true }
+        .sheet(isPresented: $showDetail) {
+            FocusSessionsDetailView(focusSessions: focusSessions)
+        }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.1)) {
                 isAnimated = true
@@ -304,6 +313,147 @@ struct FocusSession: Identifiable, Equatable {
     static func == (lhs: FocusSession, rhs: FocusSession) -> Bool {
         lhs.id == rhs.id
     }
+}
+
+// MARK: - Detail View
+
+struct FocusSessionsDetailView: View {
+    let focusSessions: [FocusSession]
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                Text("All Focus Sessions")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if focusSessions.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "flame")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    Text("No focus sessions yet")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(focusSessions) { session in
+                            FocusSessionDetailCard(session: session)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(32)
+        .frame(width: 600, height: 700)
+    }
+}
+
+struct FocusSessionDetailCard: View {
+    let session: FocusSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "flame.fill")
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(session.durationMinutes) minutes")
+                        .font(.body.weight(.bold))
+
+                    Text("\(formatTime(session.startTime)) - \(formatTime(session.endTime))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(sessionQuality(session.durationMinutes))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(sessionQualityColor(session.durationMinutes))
+                    )
+            }
+
+            if !session.uniqueApps.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Apps Used")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+
+                    FlowLayout(spacing: 6) {
+                        ForEach(session.uniqueApps, id: \.self) { app in
+                            Text(app)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.purple.opacity(0.1))
+                                .foregroundStyle(.purple)
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.purple.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func sessionQuality(_ minutes: Int) -> String {
+        switch minutes {
+        case 0..<45: return "Focus"
+        case 45..<90: return "Deep Work"
+        default: return "Flow State"
+        }
+    }
+
+    private func sessionQualityColor(_ minutes: Int) -> Color {
+        switch minutes {
+        case 0..<45: return .blue
+        case 45..<90: return .purple
+        default: return .orange
+        }
+    }
+}
+
+// Simple flow layout for tags (if not already defined)
+extension FlowLayout {
+    // Already defined in DailyHeatmap.swift
 }
 
 #Preview {

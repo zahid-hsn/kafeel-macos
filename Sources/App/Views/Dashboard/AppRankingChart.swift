@@ -9,6 +9,8 @@ struct AppRankingChart: View {
 
     @State private var selectedApp: String?
     @State private var isAnimated = false
+    @State private var showDetail = false
+    @State private var isHovering = false
 
     private var topApps: [AppRankData] {
         let total = stats.map(\.totalSeconds).reduce(0, +)
@@ -74,6 +76,13 @@ struct AppRankingChart: View {
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.01 : 1.0)
+        .animation(.spring(response: 0.3), value: isHovering)
+        .onHover { isHovering = $0 }
+        .onTapGesture { showDetail = true }
+        .sheet(isPresented: $showDetail) {
+            AppRankingDetailView(stats: stats, categories: categories, topApps: topApps)
+        }
         .onAppear {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.7).delay(0.1)) {
                 isAnimated = true
@@ -287,6 +296,210 @@ private struct RankingAppIconView: View {
         }
         let appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
         icon = appIcon
+    }
+}
+
+// MARK: - Detail View
+
+struct AppRankingDetailView: View {
+    let stats: [AppUsageStat]
+    let categories: [String: CategoryType]
+    let topApps: [AppRankData]
+    @Environment(\.dismiss) var dismiss
+
+    private var allApps: [AppRankData] {
+        let total = stats.map(\.totalSeconds).reduce(0, +)
+        guard total > 0 else { return [] }
+
+        return stats.enumerated().map { index, stat in
+            let percentage = Double(stat.totalSeconds) / Double(total) * 100
+            let category = categories[stat.bundleIdentifier] ?? .neutral
+
+            return AppRankData(
+                id: UUID(),
+                rank: index + 1,
+                bundleId: stat.bundleIdentifier,
+                appName: stat.appName,
+                duration: stat.totalSeconds,
+                percentage: percentage,
+                category: category
+            )
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Full App Rankings")
+                        .font(.title2.weight(.bold))
+
+                    Text("\(allApps.count) apps tracked")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 20) {
+                CategorySummaryCard(
+                    title: "Productive",
+                    count: allApps.filter { $0.category == .productive }.count,
+                    totalTime: allApps.filter { $0.category == .productive }.map(\.duration).reduce(0, +),
+                    color: .green
+                )
+
+                CategorySummaryCard(
+                    title: "Neutral",
+                    count: allApps.filter { $0.category == .neutral }.count,
+                    totalTime: allApps.filter { $0.category == .neutral }.map(\.duration).reduce(0, +),
+                    color: .gray
+                )
+
+                CategorySummaryCard(
+                    title: "Distracting",
+                    count: allApps.filter { $0.category == .distracting }.count,
+                    totalTime: allApps.filter { $0.category == .distracting }.map(\.duration).reduce(0, +),
+                    color: .red
+                )
+            }
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(allApps) { app in
+                        DetailedAppRankRow(app: app)
+                    }
+                }
+            }
+        }
+        .padding(32)
+        .frame(width: 700, height: 700)
+    }
+}
+
+struct CategorySummaryCard: View {
+    let title: String
+    let count: Int
+    let totalTime: Int
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("\(count)")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(color)
+
+            Text(formatDuration(totalTime))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(color.opacity(0.1))
+        )
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+}
+
+struct DetailedAppRankRow: View {
+    let app: AppRankData
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("#\(app.rank)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 40, alignment: .leading)
+
+            RankingAppIconView(bundleId: app.bundleId)
+                .frame(width: 32, height: 32)
+                .cornerRadius(6)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.appName)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(app.category.color)
+                        .frame(width: 6, height: 6)
+
+                    Text(categoryLabel(app.category))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatDuration(app.duration))
+                    .font(.body.weight(.semibold))
+
+                Text("\(Int(app.percentage))%")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(app.category.color.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(app.category.color.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func categoryLabel(_ category: CategoryType) -> String {
+        switch category {
+        case .productive: return "Productive"
+        case .neutral: return "Neutral"
+        case .distracting: return "Distracting"
+        }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
     }
 }
 

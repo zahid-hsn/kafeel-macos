@@ -6,6 +6,9 @@ struct PersonalBestCard: View {
     let records: [PersonalRecord]
     let streak: Streak
 
+    @State private var isHovering = false
+    @State private var showDetail = false
+
     private var bestDayRecord: PersonalRecord? {
         records.first { $0.category == .bestDayScore }
     }
@@ -263,9 +266,37 @@ struct PersonalBestCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.cornerRadiusLarge, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+                .strokeBorder(
+                    isHovering ? Color.orange.opacity(0.4) : Color.orange.opacity(0.2),
+                    lineWidth: isHovering ? 1.5 : 1
+                )
+                .animation(AppTheme.animationFast, value: isHovering)
         )
-        .shadow(color: .orange.opacity(0.1), radius: 10, y: 4)
+        .shadow(
+            color: isHovering ? Color.orange.opacity(0.2) : Color.orange.opacity(0.1),
+            radius: isHovering ? 16 : 10,
+            y: isHovering ? 6 : 4
+        )
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(AppTheme.animationSpring, value: isHovering)
+        .onTapGesture {
+            showDetail = true
+        }
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+        .sheet(isPresented: $showDetail) {
+            PersonalBestDetailView(
+                todayScore: todayScore,
+                records: records,
+                streak: streak
+            )
+        }
     }
 }
 

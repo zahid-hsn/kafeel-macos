@@ -1,8 +1,16 @@
 import SwiftUI
+import KafeelCore
 
 struct FocusScoreDonut: View {
     let score: Double
+    let productiveSeconds: Int
+    let distractingSeconds: Int
+    let neutralSeconds: Int
+    let totalSeconds: Int
+
     @State private var animatedScore: Double = 0
+    @State private var isHovering = false
+    @State private var showDetail = false
 
     private var scoreColor: Color {
         switch score {
@@ -94,9 +102,30 @@ struct FocusScoreDonut: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.cornerRadiusLarge, style: .continuous)
-                .strokeBorder(scoreColor.opacity(0.2), lineWidth: 1)
+                .strokeBorder(
+                    isHovering ? scoreColor.opacity(0.4) : scoreColor.opacity(0.2),
+                    lineWidth: isHovering ? 1.5 : 1
+                )
+                .animation(AppTheme.animationFast, value: isHovering)
         )
-        .shadow(color: scoreColor.opacity(0.1), radius: 10, y: 4)
+        .shadow(
+            color: isHovering ? scoreColor.opacity(0.2) : scoreColor.opacity(0.1),
+            radius: isHovering ? 16 : 10,
+            y: isHovering ? 6 : 4
+        )
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(AppTheme.animationSpring, value: isHovering)
+        .onTapGesture {
+            showDetail = true
+        }
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
         .onAppear {
             withAnimation(.spring(response: 1.2, dampingFraction: 0.7).delay(0.2)) {
                 animatedScore = score
@@ -107,14 +136,41 @@ struct FocusScoreDonut: View {
                 animatedScore = newValue
             }
         }
+        .sheet(isPresented: $showDetail) {
+            FocusScoreDetailView(
+                score: score,
+                productiveSeconds: productiveSeconds,
+                distractingSeconds: distractingSeconds,
+                neutralSeconds: neutralSeconds,
+                totalSeconds: totalSeconds
+            )
+        }
     }
 }
 
 #Preview {
     HStack {
-        FocusScoreDonut(score: 85)
-        FocusScoreDonut(score: 65)
-        FocusScoreDonut(score: 45)
+        FocusScoreDonut(
+            score: 85,
+            productiveSeconds: 18000,
+            distractingSeconds: 3600,
+            neutralSeconds: 7200,
+            totalSeconds: 28800
+        )
+        FocusScoreDonut(
+            score: 65,
+            productiveSeconds: 12000,
+            distractingSeconds: 7200,
+            neutralSeconds: 9600,
+            totalSeconds: 28800
+        )
+        FocusScoreDonut(
+            score: 45,
+            productiveSeconds: 7200,
+            distractingSeconds: 12000,
+            neutralSeconds: 9600,
+            totalSeconds: 28800
+        )
     }
     .padding()
 }
