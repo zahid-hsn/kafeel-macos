@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 import KafeelCore
 
 struct GitActivityDashboardCard: View {
@@ -9,6 +10,36 @@ struct GitActivityDashboardCard: View {
 
     private var stats: GitRepoStats {
         GitService.shared.getAggregatedStats(from: commits)
+    }
+
+    private var activeReposCount: Int {
+        Set(commits.map { $0.repositoryName }).count
+    }
+
+    private var todayCommits: Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return commits.filter { calendar.isDate($0.date, inSameDayAs: today) }.count
+    }
+
+    private var weekCommits: Int {
+        let calendar = Calendar.current
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        return commits.filter { $0.date >= weekAgo }.count
+    }
+
+    private var last7DaysData: [DailyCommitData] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var data: [DailyCommitData] = []
+
+        for dayOffset in (0..<7).reversed() {
+            if let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) {
+                let count = commits.filter { calendar.isDate($0.date, inSameDayAs: date) }.count
+                data.append(DailyCommitData(date: date, commits: count))
+            }
+        }
+        return data
     }
 
     var body: some View {
@@ -29,38 +60,66 @@ struct GitActivityDashboardCard: View {
             }
 
             HStack(spacing: 20) {
-                GitStatItem(
-                    value: "\(stats.totalCommits)",
-                    label: "Commits",
-                    color: .orange
-                )
+                VStack(alignment: .leading, spacing: 12) {
+                    GitStatItem(
+                        value: "\(todayCommits)",
+                        label: "Today",
+                        color: .orange
+                    )
+
+                    GitStatItem(
+                        value: "\(weekCommits)",
+                        label: "This Week",
+                        color: .orange.opacity(0.7)
+                    )
+
+                    GitStatItem(
+                        value: "\(activeReposCount)",
+                        label: "Repos",
+                        color: .blue
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Divider()
-                    .frame(height: 40)
+                    .frame(height: 80)
 
-                GitStatItem(
-                    value: formatNumber(stats.totalAdditions),
-                    label: "Lines Added",
-                    color: .green
-                )
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Last 7 Days")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                Divider()
-                    .frame(height: 40)
-
-                GitStatItem(
-                    value: formatNumber(stats.totalDeletions),
-                    label: "Lines Removed",
-                    color: .red
-                )
-
-                Divider()
-                    .frame(height: 40)
-
-                GitStatItem(
-                    value: "\(stats.filesChanged)",
-                    label: "Files Changed",
-                    color: .blue
-                )
+                    if !last7DaysData.isEmpty {
+                        Chart(last7DaysData) { item in
+                            BarMark(
+                                x: .value("Day", item.date, unit: .day),
+                                y: .value("Commits", item.commits)
+                            )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.orange, .orange.opacity(0.6)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .cornerRadius(2)
+                        }
+                        .chartXAxis {
+                            AxisMarks(values: .stride(by: .day)) { _ in
+                                AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
+                                    .font(.system(size: 8))
+                            }
+                        }
+                        .chartYAxis(.hidden)
+                        .frame(height: 60)
+                    } else {
+                        Text("No activity")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .frame(height: 60)
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(20)
@@ -92,6 +151,12 @@ struct GitActivityDashboardCard: View {
         }
         return "\(num)"
     }
+}
+
+private struct DailyCommitData: Identifiable {
+    let id = UUID()
+    let date: Date
+    let commits: Int
 }
 
 struct GitStatItem: View {

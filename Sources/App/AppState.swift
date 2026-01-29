@@ -135,6 +135,40 @@ final class AppState {
         }
     }
 
+    // MARK: - Git Activity Scanning
+
+    func refreshGitActivity() async -> GitScanResult {
+        guard let modelContext = modelContext else {
+            return GitScanResult(
+                repositoriesFound: 0,
+                commitsFound: 0,
+                newCommitsAdded: 0,
+                scanDuration: 0,
+                errors: ["No model context available"]
+            )
+        }
+
+        // Fetch app settings
+        let settingsDescriptor = FetchDescriptor<AppSettings>()
+        guard let settings = try? modelContext.fetch(settingsDescriptor).first else {
+            return GitScanResult(
+                repositoriesFound: 0,
+                commitsFound: 0,
+                newCommitsAdded: 0,
+                scanDuration: 0,
+                errors: ["No settings found"]
+            )
+        }
+
+        // Perform scan using GitScanService
+        let result = await GitScanService.shared.scanWorkspace(settings: settings)
+
+        // Refresh the git activity array
+        fetchGitActivity(modelContext: modelContext)
+
+        return result
+    }
+
     // MARK: - Private Helpers
 
     private func calculateAppUsageStats() {

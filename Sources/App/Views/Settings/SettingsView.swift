@@ -6,6 +6,9 @@ import KafeelCore
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settings: [AppSettings]
+    @State private var isScanning = false
+    @State private var lastScanResult: GitScanResult?
+    @State private var scanError: String?
 
     private var appSettings: AppSettings? {
         settings.first
@@ -270,6 +273,52 @@ struct SettingsView: View {
     private var gitRepositoriesSection: some View {
         Section("Git Repositories") {
             if let settings = appSettings {
+                // Scan Now Button
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        Task {
+                            await performGitScan()
+                        }
+                    } label: {
+                        HStack {
+                            if isScanning {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .frame(width: 16, height: 16)
+                                Text("Scanning...")
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Scan Now")
+                            }
+                        }
+                    }
+                    .disabled(isScanning)
+
+                    // Scan Status
+                    if let result = lastScanResult {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("\(result.repositoriesFound) repos scanned, \(result.newCommitsAdded) new commits")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let error = scanError {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+
+                Divider()
+
+                // Repository List
                 ForEach(settings.watchedRepositories, id: \.self) { repo in
                     HStack {
                         Image(systemName: "folder")
@@ -293,6 +342,8 @@ struct SettingsView: View {
                 } label: {
                     Label("Add Repository", systemImage: "plus.circle.fill")
                 }
+
+                Divider()
 
                 Picker("Scan Frequency", selection: Binding(
                     get: { settings.gitScanFrequencyHours },
@@ -330,6 +381,34 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://github.com")!) {
                 Label("GitHub Repository", systemImage: "link")
             }
+        }
+    }
+
+    // MARK: - Git Scanning
+
+    @MainActor
+    private func performGitScan() async {
+        isScanning = true
+        scanError = nil
+        lastScanResult = nil
+
+        defer { isScanning = false }
+
+        // Create a temporary AppState to perform the scan
+        let appState = AppState(modelContext: modelContext)
+
+        do {
+            let result = try await appState.refreshGitActivity()
+            lastScanResult = result
+            print("Manual git scan completed: \(result.repositoriesFound) repos, \(result.newCommitsAdded) new commits")
+
+            // Show errors if any
+            if !result.errors.isEmpty {
+                scanError = result.errors.joined(separator: ", ")
+            }
+        } catch {
+            scanError = "Scan failed: \(error.localizedDescription)"
+            print("Error during manual git scan: \(error)")
         }
     }
 }

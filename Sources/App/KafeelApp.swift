@@ -48,6 +48,8 @@ struct KafeelApp: App {
                     appState.startTracking()
                     // Setup menu bar
                     menuBarManager.setup(appState: appState)
+                    // Start git scanning tasks
+                    await startGitScanning()
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -113,6 +115,74 @@ struct KafeelApp: App {
         }
 
         try? context.save()
+    }
+
+    @MainActor
+    private func startGitScanning() async {
+        // Initial scan after short delay
+        try? await Task.sleep(for: .seconds(5))
+        await performInitialGitScan()
+
+        // Start periodic scanning loop
+        Task {
+            await periodicGitScanLoop()
+        }
+    }
+
+    @MainActor
+    private func performInitialGitScan() async {
+        let context = modelContainer.mainContext
+        let settingsDescriptor = FetchDescriptor<AppSettings>()
+        guard let settings = try? context.fetch(settingsDescriptor).first else { return }
+
+        // Only scan if auto-scan is enabled
+        guard settings.autoScanEnabled else {
+            print("Git auto-scan is disabled")
+            return
+        }
+
+        print("Starting initial git scan...")
+        let result = await appState.refreshGitActivity()
+        print("Initial git scan completed: \(result.repositoriesFound) repos, \(result.newCommitsAdded) new commits")
+        if !result.errors.isEmpty {
+            print("Scan errors: \(result.errors)")
+        }
+    }
+
+    @MainActor
+    private func periodicGitScanLoop() async {
+        while true {
+            let context = modelContainer.mainContext
+            let settingsDescriptor = FetchDescriptor<AppSettings>()
+            guard let settings = try? context.fetch(settingsDescriptor).first else {
+                try? await Task.sleep(for: .seconds(3600)) // 1 hour
+                continue
+            }
+
+            // Check if auto-scan is enabled
+            guard settings.autoScanEnabled else {
+                try? await Task.sleep(for: .seconds(300)) // Check again in 5 minutes
+                continue
+            }
+
+            // Check scan frequency
+            let frequencyHours = settings.gitScanFrequencyHours
+            guard frequencyHours > 0 else {
+                try? await Task.sleep(for: .seconds(300)) // Manual only mode
+                continue
+            }
+
+            // Wait for the configured interval
+            try? await Task.sleep(for: .seconds(Double(frequencyHours) * 3600))
+
+            // Perform scan
+            print("Starting periodic git scan (every \(frequencyHours) hours)...")
+            let result = await appState.refreshGitActivity()
+            print("Periodic git scan completed: \(result.repositoriesFound) repos, \(result.newCommitsAdded) new commits")
+            if !result.errors.isEmpty {
+                print("Scan errors: \(result.errors)")
+            }
+        }
     }
 
     /// Generate app icon PNG files

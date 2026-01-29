@@ -13,6 +13,7 @@ public final class PersistenceService {
             ActivityLog.self,
             AppCategory.self,
             AppSettings.self,
+            GitActivity.self,
             // Flow Score models
             DailyScore.self,
             Streak.self,
@@ -125,6 +126,7 @@ public final class PersistenceService {
         try context.delete(model: ActivityLog.self)
         try context.delete(model: AppCategory.self)
         try context.delete(model: AppSettings.self)
+        try context.delete(model: GitActivity.self)
         try context.delete(model: DailyScore.self)
         try context.delete(model: Streak.self)
         try context.delete(model: Achievement.self)
