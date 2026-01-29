@@ -36,6 +36,9 @@ struct DashboardView: View {
 
                     Spacer()
 
+                    // Share/Export Toolbar
+                    ShareExportToolbar()
+
                     TimeFilterPicker(selectedFilter: $state.selectedTimeFilter)
                         .frame(width: 200)
                 }

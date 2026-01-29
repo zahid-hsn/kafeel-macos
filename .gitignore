@@ -8,3 +8,6 @@ xcuserdata/
 Kafeel.app/
 *.dmg
 .build/
+
+# Object files
+*.o

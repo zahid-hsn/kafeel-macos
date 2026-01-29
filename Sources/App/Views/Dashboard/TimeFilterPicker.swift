@@ -1,4 +1,5 @@
 import SwiftUI
+import KafeelCore
 
 struct TimeFilterPicker: View {
     @Binding var selectedFilter: TimeFilter
