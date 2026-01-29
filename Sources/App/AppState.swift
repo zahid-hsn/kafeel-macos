@@ -17,6 +17,9 @@ final class AppState {
     var recentGitActivity: [GitActivity] = []
     var weeklyFocusScores: [Double] = []
 
+    // Browser History
+    var browsingActivities: [BrowsingActivity] = []
+
     // Activity Monitor
     var activityMonitor: ActivityMonitor
     var isTrackingEnabled: Bool = true
@@ -108,6 +111,8 @@ final class AppState {
             calculateFocusScore(modelContext: modelContext)
             // Fetch git activity
             fetchGitActivity(modelContext: modelContext)
+            // Fetch browser history
+            fetchBrowsingHistory(startDate: startDate)
 
         } catch {
             print("Error refreshing data: \(error)")
@@ -133,6 +138,14 @@ final class AppState {
             print("Error fetching git activity: \(error)")
             recentGitActivity = []
         }
+    }
+
+    private func fetchBrowsingHistory(startDate: Date) {
+        // Fetch browsing history using BrowserHistoryService
+        // This gracefully handles cases where permissions aren't granted
+        let history = BrowserHistoryService.shared.fetchHistory(since: startDate, limit: 500)
+        browsingActivities = history
+        print("Fetched \(history.count) browsing activities since \(startDate)")
     }
 
     // MARK: - Git Activity Scanning

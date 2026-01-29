@@ -133,7 +133,7 @@ struct DashboardView: View {
                         categories: fetchCategories()
                     )
 
-                    BrowsingActivityCard()
+                    BrowsingActivityCard(activities: appState.browsingActivities)
                 }
 
                 // Analytics Section Header
