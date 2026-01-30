@@ -102,7 +102,10 @@ final class AppState {
                 sortBy: [SortDescriptor(\.startTime, order: .reverse)]
             )
 
-            todayActivities = try modelContext.fetch(descriptor)
+            let fetchedActivities = try modelContext.fetch(descriptor)
+
+            // Filter out loginwindow - it represents idle time, not active usage
+            todayActivities = fetchedActivities.filter { $0.appBundleIdentifier != "com.apple.loginwindow" }
 
             // Calculate app usage statistics
             calculateAppUsageStats()

@@ -116,6 +116,14 @@ public final class ActivityMonitor {
         let bundleId = app.bundleIdentifier ?? "unknown"
         let appName = app.localizedName ?? "Unknown App"
 
+        // Skip loginwindow - it represents idle/locked screen time, not active usage
+        if bundleId == "com.apple.loginwindow" {
+            print("ActivityMonitor: Skipping loginwindow (idle time)")
+            finalizeCurrentActivity()
+            currentApp = "Idle"
+            return
+        }
+
         // Get window title if available
         let windowTitle: String? = nil // AXUIElement would be needed for this
 
