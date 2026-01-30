@@ -23,7 +23,17 @@ public final class PersistenceService {
             MeetingSession.self
         ])
 
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // Use a fixed location for the database to persist data across runs
+        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let kafeelDir = appSupportURL.appendingPathComponent("Kafeel", isDirectory: true)
+
+        // Create directory if it doesn't exist
+        try? FileManager.default.createDirectory(at: kafeelDir, withIntermediateDirectories: true)
+
+        let storeURL = kafeelDir.appendingPathComponent("kafeel.store")
+        print("PersistenceService: Database location: \(storeURL.path)")
+
+        let modelConfiguration = ModelConfiguration("Kafeel", schema: schema, url: storeURL)
 
         do {
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
